@@ -1,56 +1,76 @@
 // =======================================================
-// app.js (ใช้ Fetch API เพื่อส่ง HTTP POST ไปยัง API Gateway)
+// app.js (Hybrid Logic: POST Command, GET Status Polling)
 // =======================================================
 
-// *** 1. ข้อมูลสำคัญ: ต้องเปลี่ยน URL นี้เป็น Invoke URL ที่ได้จาก API Gateway ***
-// ตัวอย่าง URL: https://xxxxxxxxxx.execute-api.us-west-2.amazonaws.com/prod/command
-const API_GATEWAY_URL = "YOUR_API_GATEWAY_INVOKE_URL_HERE";
+// *** 1. Configuration (ต้องเปลี่ยน URL) ***
+// URL BASE: ใช้เป็น Root ของ API Gateway เช่น https://.../dev/smarthome
+const API_COMMAND_URL_BASE =
+  "https://YOUR_API_GATEWAY";
 
-// *** 2. ตัวแปร Global และ DOM Elements ***
-const statusDisplay = document.getElementById("status-display");
+// ลบ: API_LED_STATE_URL และ API_SENSOR_READINGS_URL ออก
+
+const POLLING_INTERVAL = 3000; // ดึงสถานะทุก 3 วินาที
+
+// *** 2. Global DOM Elements ***
 const apiStatus = document.getElementById("api-status");
-const onButton = document.getElementById("onButton");
-const offButton = document.getElementById("offButton");
+const ROOMS = ["bedroom", "livingroom"];
 
 // ----------------------------------------------------
-// A. ฟังก์ชันอัปเดต UI
+// ฟังก์ชันอัปเดต UI (แยกตาม Room ID)
 // ----------------------------------------------------
-function updateStatusDisplay(state, isError = false) {
-  // ใช้เพื่ออัปเดต badge สถานะ
-  const upperState = state.toUpperCase();
-  statusDisplay.textContent = upperState;
-  let className = "bg-secondary";
+function updateRoomUI(room, stateData, sensorData) {
+  // Note: stateData มาจาก smarthome-state (LED), sensorData มาจาก smarthome-readings (Temp/Humid/Motion)
 
-  if (upperState === "ON") {
-    className = "bg-success";
-  } else if (upperState === "OFF") {
-    className = "bg-danger";
-  } else if (isError) {
-    className = "bg-warning text-dark";
-  } else if (upperState.startsWith("SENDING")) {
-    className = "bg-info";
+  const tempElement = document.getElementById(`temp-dial-value-${room}`);
+  const humidElement = document.getElementById(`humidity-value-${room}`);
+  const motionElement = document.getElementById(`motion-status-${room}`);
+  const ledTextElement = document.getElementById(`led-status-text-${room}`);
+  const ledToggle = document.getElementById(`ledToggle-${room}`);
+  const tempDisplay = document.getElementById(`temp-display-${room}`);
+
+  // 1. Update LED Status (จาก smarthome-state)
+  const ledState =
+    stateData && stateData.LedStatus
+      ? stateData.LedStatus.toLowerCase()
+      : "off";
+  ledTextElement.textContent = ledState.toUpperCase();
+  ledToggle.checked = ledState === "on"; // ตั้งค่า Toggle Switch
+
+  // 2. Update Sensor Data (จาก smarthome-readings)
+  // ตรวจสอบและแปลงค่าให้เป็น Number (อาจมาจาก DynamoDB 'N' type)
+  const temp =
+    sensorData && sensorData.Temperature
+      ? parseFloat(sensorData.Temperature)
+      : "--";
+  const humid = sensorData && sensorData.Humidity ? sensorData.Humidity : "--";
+  const motion =
+    sensorData && sensorData.MotionStatus ? sensorData.MotionStatus : "Unknown";
+
+  if (temp !== "--") {
+    tempElement.textContent = temp.toFixed(1);
+    tempDisplay.textContent = `${temp.toFixed(1)}°C`;
   }
-
-  statusDisplay.className = `badge ${className}`;
+  humidElement.textContent = `${humid}%`;
+  motionElement.textContent = motion;
 }
 
 // ----------------------------------------------------
-// B. ฟังก์ชันส่งคำสั่ง (ถูกเรียกโดยปุ่ม ON/OFF)
+// ฟังก์ชันส่งคำสั่ง (HTTP POST) - รองรับ 2 ห้อง
 // ----------------------------------------------------
-async function sendCommand(state) {
-  // state ที่รับเข้ามาจะเป็น 'on' หรือ 'off' (ตัวพิมพ์เล็ก)
+async function sendCommand(room) {
+  const ledToggle = document.getElementById(`ledToggle-${room}`);
+  const state = ledToggle.checked ? "on" : "off"; 
 
-  // 1. ปิดปุ่มชั่วคราวขณะส่งคำสั่ง
-  onButton.disabled = true;
-  offButton.disabled = true;
-  apiStatus.textContent = "Sending HTTP POST command...";
-  updateStatusDisplay(`Sending ${state}`, false);
+  // URL สั่งงาน: /smarthome/{room}/led/control
+  const targetURL = `${API_COMMAND_URL_BASE}/${room}/led/control`;
 
-  // 2. สร้าง Payload ที่ Lambda คาดหวัง: {"state": "on"}
-  const payload = { cmd: state };
+  apiStatus.textContent = `Sending ${room} command...`;
+
+  // Payload: { room: "bedroom", cmd: "on" }
+  const payload = { room: room, cmd: state };
 
   try {
-    const response = await fetch(API_GATEWAY_URL, {
+    const response = await fetch(targetURL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -58,39 +78,137 @@ async function sendCommand(state) {
       body: JSON.stringify(payload),
     });
 
-    // 3. ตรวจสอบผลลัพธ์
     if (response.ok) {
-      // คำสั่งถูกส่งไปถึง Lambda และ Lambda ส่ง MQTT ไปแล้ว
-      apiStatus.textContent = "Success: IoT Command Published.";
-      updateStatusDisplay(state); // อัปเดตสถานะด้วย 'on' หรือ 'off'
+      apiStatus.textContent = `Success: Command sent to ${room}. Awaiting ESP32 feedback...`;
     } else {
-      // API Gateway/Lambda ตอบกลับเป็น Error
       const errorData = await response.json();
-      apiStatus.textContent = "API Error";
-      updateStatusDisplay("Failed", true);
+      apiStatus.textContent = `API Error for ${room}: ${
+        errorData.message || "Unknown"
+      }`;
       console.error("API Error:", errorData);
-      // ใช้วิธีแสดงข้อความผิดพลาดที่ไม่ใช่ alert() ใน production
     }
   } catch (error) {
-    // 4. จัดการข้อผิดพลาดเครือข่าย/CORS
     apiStatus.textContent = "Network Error (Check CORS/URL)";
-    updateStatusDisplay("Error", true);
-    console.error("Network or Fetch Error:", error);
-  } finally {
-    // 5. เปิดปุ่มกลับมาทำงาน
-    onButton.disabled = false;
-    offButton.disabled = false;
+    console.error("Network Error:", error);
   }
 }
 
 // ----------------------------------------------------
-// C. ฟังก์ชันเริ่มต้น (ถูกเรียกโดย onload="initApp()")
+// ฟังก์ชัน Polling (ดึงสถานะล่าสุดจาก DB)
+// ----------------------------------------------------
+async function startPolling() {
+  try {
+    const fetchPromises = [];
+
+    // 1. สร้าง Promises สำหรับการดึงข้อมูลทั้ง 2 API และทั้ง 2 ห้อง
+    ROOMS.forEach((room) => {
+      // URL LED State: /smarthome/{room}/led/status
+      const ledStatusURL = `${API_COMMAND_URL_BASE}/${room}/led/status?room=${room}`;
+      fetchPromises.push(
+        fetch(ledStatusURL, { method: "GET" })
+          .then((res) => res.json())
+          .then((data) => ({ room: room, type: "state", data: data }))
+          .catch((error) => ({
+            room: room,
+            type: "state",
+            error: "Failed to fetch LED State",
+          }))
+      );
+
+      // URL Sensor Readings: /smarthome/{room}/sensor/status
+      const sensorStatusURL = `${API_COMMAND_URL_BASE}/${room}/sensor/status?room=${room}`;
+      fetchPromises.push(
+        fetch(sensorStatusURL, { method: "GET" })
+          .then((res) => res.json())
+          .then((data) => ({ room: room, type: "sensor", data: data }))
+          .catch((error) => ({
+            room: room,
+            type: "sensor",
+            error: "Failed to fetch Sensor Readings",
+          }))
+      );
+    });
+
+    // 2. รัน Promises ทั้งหมดพร้อมกัน
+    const results = await Promise.all(fetchPromises);
+
+    // 3. จัดกลุ่มข้อมูล
+    const roomData = {};
+    ROOMS.forEach((room) => (roomData[room] = { state: null, sensor: null }));
+
+    results.forEach((res) => {
+      if (res.data) {
+        if (res.type === "state") roomData[res.room].state = res.data;
+        if (res.type === "sensor") roomData[res.room].sensor = res.data;
+      } else if (res.error) {
+        console.warn(
+          `Polling warning for ${res.room} (${res.type}): ${res.error}`
+        );
+      }
+    });
+
+    // 4. อัปเดต UI
+    ROOMS.forEach((room) => {
+      // ตรวจสอบว่ามีข้อมูลทั้งสถานะไฟและเซ็นเซอร์ก่อนอัปเดต UI
+      if (roomData[room].state && roomData[room].sensor) {
+        updateRoomUI(room, roomData[room].state, roomData[room].sensor);
+      }
+    });
+
+    apiStatus.textContent = `Status updated @ ${new Date().toLocaleTimeString()}`;
+  } catch (error) {
+    apiStatus.textContent = "Polling Failed (Database/API Read Error)";
+    console.error("Polling Error:", error);
+  }
+}
+
+function updateClock() {
+  const now = new Date();
+  // DOM IDs จาก index.html
+  const timeElement = document.getElementById("current-time");
+  const dateElement = document.getElementById("current-date");
+
+  if (timeElement && dateElement) {
+    // Time (HH:MM:SS format)
+    const timeString = now.toLocaleTimeString("th-TH", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    // Date (Day, Month, Year)
+    const dateString = now.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    timeElement.textContent = timeString;
+    dateElement.textContent = dateString;
+  }
+}
+
+// ----------------------------------------------------
+// ฟังก์ชันเริ่มต้น App
 // ----------------------------------------------------
 function initApp() {
-  // 1. เปิดปุ่มทันทีที่ App พร้อม (เพราะไม่มีการรอ Connect MQTT)
-  onButton.disabled = false;
-  offButton.disabled = false;
+  ROOMS.forEach((room) => {
+    const ledToggle = document.getElementById(`ledToggle-${room}`);
+    if (ledToggle) ledToggle.disabled = false;
+  });
 
-  apiStatus.textContent = "Ready.";
-  updateStatusDisplay("Ready", false);
+  apiStatus.textContent = "App Initialized. Starting Polling...";
+
+  // 2. เริ่มดึงข้อมูลสถานะทันทีและตั้ง Interval
+  startPolling();
+  setInterval(startPolling, POLLING_INTERVAL);
 }
+
+setInterval(updateClock, 1000);
+updateClock(); // Initial call to display time immediately
+
+// Global exposure for event handlers (Toggle Switch)
+window.sendCommand = sendCommand;
+window.toggleLED = function (room) {
+  sendCommand(room);
+};

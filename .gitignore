@@ -1,2 +1,7 @@
-esp32-bedroom-secrets/
-firmwares/bedroom/secrets.h
+smarthome-bedroom-secrets/
+smarthome-livingroom-secrets/
+firmwares/bedroom/sensor/secrets.h
+firmwares/bedroom/motion/secrets.h
+firmwares/livingroom/sensor/secrets.h
+firmwares/livingroom/motion/secrets.h
+.vs

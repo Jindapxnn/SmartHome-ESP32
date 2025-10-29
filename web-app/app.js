@@ -636,6 +636,9 @@ async function controlLED(room) {
   const oldChecked = !checkbox.checked;
   const oldStatus = oldChecked ? "on" : "off";
 
+  const nowISO = new Date().toISOString();
+  const fullTimeString = formatTimeStamp(nowISO);
+
   // 1. **Optimistic Update (อัปเดต UI ทันที)**
   //   - สถานะ Checkbox ได้เปลี่ยนไปแล้วโดยเบราว์เซอร์
   //   - อัปเดตข้อความสถานะทันที
@@ -666,6 +669,7 @@ async function controlLED(room) {
       throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
     }
 
+    homeStatusElement.textContent = `LED Command Sent - ${room} -> ${newStatus.toUpperCase()} @ ${extractTime(fullTimeString)}`;
     // const data = await response.json();
     // console.log(`[LED Control] Command successful:`, data);
 

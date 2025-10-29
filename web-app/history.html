@@ -90,8 +90,8 @@
         </a>
       </nav>
     </aside>
-    <div class="p-6 md:p-10 min-h-screen">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+    <div class="p-6 md:p-8 min-h-screen">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-4">
         <div class="lg:col-span-2 p-6">
           <h1 class="text-4xl font-bold primary-blue-text mb-2">
             ประวัติข้อมูลเซ็นเซอร์
@@ -115,6 +115,22 @@
               -- Month, ----
             </p>
           </div>
+        </div>
+      </div>
+      <div
+        class="dashboard-card p-4 my-4 flex justify-between items-center text-sm"
+      >
+        <div class="flex items-center">
+          <span
+            id="api-status-circle-history"
+            class="w-3 h-3 rounded-full bg-gray-500 mr-2"
+          ></span>
+          <p class="text-gray-700">
+            System Status:
+            <span id="api-status-history" class="font-medium"
+              >Initializing...</span
+            >
+          </p>
         </div>
       </div>
 
@@ -193,23 +209,6 @@
       <div id="motion-section" class="dashboard-card p-6 w-full">
         <h2 class="text-2xl font-semibold mb-4">Motion Data</h2>
         <div id="motion-table-container"></div>
-      </div>
-
-      <div
-        class="dashboard-card p-4 mt-8 flex justify-between items-center text-sm"
-      >
-        <div class="flex items-center">
-          <span
-            id="api-status-circle-history"
-            class="w-3 h-3 rounded-full bg-gray-500 mr-2"
-          ></span>
-          <p class="text-gray-700">
-            System Status:
-            <span id="api-status-history" class="font-medium"
-              >Initializing...</span
-            >
-          </p>
-        </div>
       </div>
     </div>
     <script src="app.js"></script>

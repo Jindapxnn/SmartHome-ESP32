@@ -164,7 +164,7 @@
     </aside>
 
     <div class="p-6 md:p-10 min-h-screen">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-4">
         <div class="lg:col-span-2 p-6">
           <h1 class="text-4xl font-bold primary-blue-text mb-2">
             ยินดีต้อนรับ!
@@ -189,6 +189,21 @@
               -- Month, ----
             </p>
           </div>
+        </div>
+      </div>
+
+      <div
+        class="dashboard-card p-4 my-4 flex justify-between items-center text-sm"
+      >
+        <div class="flex items-center">
+          <span
+            id="api-status-circle-home"
+            class="w-3 h-3 rounded-full bg-green-500 mr-2"
+          ></span>
+          <p class="text-gray-700">
+            System Status:
+            <span id="api-status-home" class="font-medium">Ready</span>
+          </p>
         </div>
       </div>
 
@@ -401,21 +416,6 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div
-        class="dashboard-card p-4 mt-8 flex justify-between items-center text-sm"
-      >
-        <div class="flex items-center">
-          <span
-            id="api-status-circle-home"
-            class="w-3 h-3 rounded-full bg-green-500 mr-2"
-          ></span>
-          <p class="text-gray-700">
-            System Status:
-            <span id="api-status-home" class="font-medium">Ready</span>
-          </p>
         </div>
       </div>
     </div>
